@@ -1,14 +1,13 @@
 name = "pixelreveal"
-main = "worker/index.ts"          # routeur Worker — écrit en phase Room/Coordinateur
+main = "worker/index.ts"
 compatibility_date = "2024-06-01"
 # Durable Objects = WebSocket Hibernation API → exige cette flag
 compatibility_flags = ["nodejs_compat"]
 
-# Sert les assets statiques (answer + palette des artworks) au Worker, côté serveur.
-# Jamais exposés tels quels au client : l'image reste secrète (cf. CLAUDE.md §4.3).
-[assets]
-directory = "./assets"
-binding = "ASSETS"
+# Pas de binding [assets] ici : les assets d'artwork contiennent `answer` (la clé de réponse)
+# et ne doivent JAMAIS être servis publiquement (§4.3/§9). Ils sont chargés côté serveur :
+# au MVP, bundlés dans le worker (worker/assets.ts) ; à terme déplaçables en R2/KV privé.
+# Le front statique (public/) est déployé séparément via Cloudflare Pages.
 
 # --- Durable Objects : un binding par rôle (cf. CLAUDE.md §4.1) ---
 # ARTWORK_ROOM : une instance par artwork (room). COORDINATOR : singleton pipeline.
