@@ -36,6 +36,15 @@ export default {
         const body = await req.text();
         return coordinator(env).fetch("https://coordinator/complete", { method: "POST", body });
       }
+      // Connexion directe à une room arbitraire (?room=KEY) — bypass de la frontière, pour
+      // tester la complétion sur un mini artwork. Hors dev, cette route n'existe pas.
+      if (url.pathname === "/__ws") {
+        const roomKey = url.searchParams.get("room");
+        if (!roomKey) return new Response("room manquant", { status: 400 });
+        const target = new URL(req.url);
+        target.searchParams.set("room", roomKey);
+        return env.ARTWORK_ROOM.get(env.ARTWORK_ROOM.idFromName(roomKey)).fetch(new Request(target, req));
+      }
     }
 
     return new Response("PixelReveal worker OK", {

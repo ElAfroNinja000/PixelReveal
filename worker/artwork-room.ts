@@ -194,8 +194,16 @@ export class ArtworkRoom implements DurableObject {
     // les sockets ne migrent pas entre DO, le client rouvre /ws et le coordinateur l'aiguille.
     if (this.revealedCount === total) {
       await this.notifyComplete();
-      this.broadcast({ type: "completed" });
+      this.broadcast({ type: "completed", ranking: this.ranking() });
     }
+  }
+
+  /** Classement par pseudo (pixels révélés), trié décroissant, top 10 — pour le beat. */
+  private ranking(): { pseudo: string; count: number }[] {
+    return [...this.tally.entries()]
+      .map(([pseudo, count]) => ({ pseudo, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
   }
 
   private localOnline(exclude?: WebSocket): number {

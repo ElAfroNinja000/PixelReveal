@@ -75,9 +75,16 @@ export interface ProgressMsg extends Progress {
   type: "progress";
 }
 
-/** L'artwork a atteint 100%. Déclenche le beat (popup). Un nouveau `welcome` suit (§4.7). */
+/** Une entrée du classement par pseudo (pixels révélés), pour le beat de complétion. */
+export interface RankEntry {
+  pseudo: string;
+  count: number;
+}
+
+/** L'artwork a atteint 100%. Déclenche le beat (popup + classement). Bascule par reconnexion. */
 export interface CompletedMsg {
   type: "completed";
+  ranking: RankEntry[];
 }
 
 /** Compteur global de joueurs en ligne (maintenu par le coordinateur). */

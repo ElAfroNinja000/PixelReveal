@@ -1,0 +1,113 @@
+:root {
+  color-scheme: dark;
+  --bg: #0d0d0d;
+  --fg: #e8e8e8;
+  --muted: #888;
+  --accent: #2ddd6a;
+  --card: #161616;
+  --line: #2a2a2a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.5 system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* --- Overlays (login + complétion) --- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 28px 32px;
+  text-align: center;
+  max-width: 340px;
+  width: calc(100% - 32px);
+}
+.card h1 { margin: 0 0 4px; font-size: 26px; }
+.card h2 { margin: 0 0 12px; font-size: 20px; }
+.muted { color: var(--muted); }
+
+form { display: flex; gap: 8px; margin-top: 16px; }
+input {
+  flex: 1;
+  background: #1d1d1d;
+  border: 1px solid var(--line);
+  color: var(--fg);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 15px;
+}
+input:focus { outline: 1px solid var(--accent); }
+button {
+  background: var(--accent);
+  color: #042; border: 0;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+}
+button:hover { filter: brightness(1.08); }
+
+/* --- HUD --- */
+#hud {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 640px;
+  padding: 12px 16px;
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+#bar { flex: 1; height: 8px; background: #222; border-radius: 4px; overflow: hidden; }
+#fill { height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+#pct { font-variant-numeric: tabular-nums; min-width: 42px; text-align: right; }
+.cool { color: #e8a23a; font-variant-numeric: tabular-nums; min-width: 64px; }
+
+/* --- Canvas --- */
+#stage { padding: 8px 16px 24px; width: 100%; display: flex; justify-content: center; }
+#wrap { position: relative; line-height: 0; }
+#cv, #fx {
+  /* Pixels nets, jamais de lissage (cf. §8). Taille réelle = grille, agrandie en CSS. */
+  image-rendering: pixelated;
+  width: min(86vw, 70vh, 640px);
+  height: min(86vw, 70vh, 640px);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+#fx { position: absolute; inset: 0; pointer-events: none; } /* couche de feedback transient */
+#cv { cursor: crosshair; }
+#cv.cooling { cursor: progress; }
+
+/* Flash global à 100% (cf. §8 : flash à 100%). */
+body.flash::after {
+  content: "";
+  position: fixed; inset: 0;
+  background: #fff;
+  z-index: 9;
+  pointer-events: none;
+  animation: flash 0.6s ease-out forwards;
+}
+@keyframes flash { from { opacity: 0.7; } to { opacity: 0; } }
+
+/* Classement */
+#ranking { text-align: left; margin: 8px 0 16px; padding-left: 22px; }
+#ranking li { padding: 2px 0; }
+#ranking li b { color: var(--accent); }
+[hidden] { display: none !important; }

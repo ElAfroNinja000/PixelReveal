@@ -17,8 +17,19 @@ export interface Asset {
 // Bundlé dans le worker par esbuild (objet JSON au runtime). Jamais servi au client.
 import artwork001 from "../assets/artwork-001.json";
 
+// Mini artwork 2x2 réservé aux tests de complétion (atteignable en 4 clics). Non listé dans
+// pipeline.json → jamais servi en prod par le coordinateur ; accessible seulement via /__ws (dev).
+const ARTWORK_TEST: Asset = {
+  id: "artwork-test",
+  width: 2,
+  height: 2,
+  palette: ["#ff0000", "#00ff00"],
+  answer: [0, 1, 1, 0],
+};
+
 const REGISTRY: Record<string, Asset> = {
   "artwork-001": artwork001 as Asset,
+  "artwork-test": ARTWORK_TEST,
 };
 
 export function loadAsset(id: string): Asset {
