@@ -2,6 +2,8 @@
 export interface Env {
   /** Une instance de DO par artwork (clé = artworkId). */
   ARTWORK_ROOM: DurableObjectNamespace;
-  /** Singleton pipeline + frontière + online global (implémenté en phase 4). */
+  /** Singleton pipeline + frontière + online global. */
   COORDINATOR: DurableObjectNamespace;
+  /** "dev" active les routes de diagnostic (cf. index.ts). Absent en production. */
+  ENVIRONMENT?: string;
 }

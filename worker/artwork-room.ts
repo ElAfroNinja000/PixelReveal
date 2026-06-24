@@ -16,9 +16,6 @@ interface Identity {
   pseudo: string;
 }
 
-// Phase 3 : une seule room. Le pipeline (plusieurs artworks) arrive en phase 4 (coordinateur).
-const ARTWORK_ID = "artwork-001";
-
 /**
  * Durable Object : une room = un artwork (cf. §4.1).
  *
@@ -31,6 +28,8 @@ const ARTWORK_ID = "artwork-001";
  */
 export class ArtworkRoom implements DurableObject {
   private loaded = false;
+  private roomKey = ""; // ex: "artwork-001#0" (artworkId + lap) — identité de cette room
+  private artworkId = "";
   private width = 0;
   private height = 0;
   private palette: string[] = [];
@@ -40,10 +39,9 @@ export class ArtworkRoom implements DurableObject {
   private readonly cooldowns = new Map<string, number>(); // sessionId -> ts dernier clic accepté
   private readonly tally = new Map<string, number>(); // pseudo -> pixels révélés
 
-  // env (COORDINATOR) sera utilisé en phase 4 pour la transition. Pas nécessaire au MVP room.
   constructor(
     private readonly ctx: DurableObjectState,
-    _env: Env,
+    private readonly env: Env,
   ) {}
 
   /**
@@ -51,12 +49,23 @@ export class ArtworkRoom implements DurableObject {
    * Idempotent et sérialisé via blockConcurrencyWhile pour éviter un double chargement
    * si plusieurs requêtes arrivent avant la fin du boot.
    */
-  private async init(): Promise<void> {
+  private async init(roomKeyParam?: string | null): Promise<void> {
     if (this.loaded) return;
     await this.ctx.blockConcurrencyWhile(async () => {
       if (this.loaded) return;
 
-      const asset = loadAsset(ARTWORK_ID); // bundlé côté serveur, jamais exposé au client
+      // L'identité de la room (roomKey) arrive en paramètre à la 1re connexion, puis est
+      // persistée : après hibernation, on la relit du storage sans dépendre de la requête.
+      let rk = await this.ctx.storage.get<string>("roomKey");
+      if (!rk && roomKeyParam) {
+        rk = roomKeyParam;
+        await this.ctx.storage.put("roomKey", rk);
+      }
+      if (!rk) throw new Error("roomKey manquant (room non initialisée)");
+      this.roomKey = rk;
+      this.artworkId = rk.split("#")[0]; // "artwork-001#0" -> "artwork-001"
+
+      const asset = loadAsset(this.artworkId); // bundlé côté serveur, jamais exposé au client
       this.width = asset.width;
       this.height = asset.height;
       this.palette = asset.palette;
@@ -82,9 +91,9 @@ export class ArtworkRoom implements DurableObject {
     });
   }
 
-  /** Point d'entrée : upgrade WebSocket uniquement. */
+  /** Point d'entrée : upgrade WebSocket uniquement. `?room=` porte l'identité (roomKey). */
   async fetch(req: Request): Promise<Response> {
-    await this.init();
+    await this.init(new URL(req.url).searchParams.get("room"));
     if (req.headers.get("Upgrade") !== "websocket") {
       return new Response("expected websocket", { status: 426 });
     }
@@ -102,8 +111,8 @@ export class ArtworkRoom implements DurableObject {
     } catch {
       return; // message illisible : on ignore, jamais d'état "faux" (§2)
     }
-    if (msg.type === "hello") this.onHello(ws, msg);
-    else if (msg.type === "paint") this.onPaint(ws, msg);
+    if (msg.type === "hello") await this.onHello(ws, msg);
+    else if (msg.type === "paint") await this.onPaint(ws, msg);
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
@@ -112,37 +121,38 @@ export class ArtworkRoom implements DurableObject {
     } catch {
       /* déjà fermé */
     }
-    this.broadcastOnline(); // un joueur de moins
+    // Le socket qui se ferme est encore listé par getWebSockets() pendant ce handler : on l'exclut.
+    await this.reportOnline(ws);
   }
 
-  async webSocketError(_ws: WebSocket): Promise<void> {
-    this.broadcastOnline();
+  async webSocketError(ws: WebSocket): Promise<void> {
+    await this.reportOnline(ws);
   }
 
   /** hello : enregistre l'identité puis envoie welcome (méta) + snapshot binaire. */
-  private onHello(ws: WebSocket, msg: HelloMsg): void {
+  private async onHello(ws: WebSocket, msg: HelloMsg): Promise<void> {
     const identity: Identity = { sessionId: msg.sessionId, pseudo: msg.pseudo };
     ws.serializeAttachment(identity); // réattaché automatiquement après hibernation
 
     const welcome: WelcomeMsg = {
       type: "welcome",
-      artworkId: ARTWORK_ID,
+      artworkId: this.artworkId,
       width: this.width,
       height: this.height,
       palette: this.palette,
       progress: { revealed: this.revealedCount, total: this.width * this.height },
-      online: this.online(),
+      online: this.localOnline(),
     };
     ws.send(encode(welcome));
     // Snapshot = un octet par pixel, en frame binaire (jamais en JSON, trop gros — §6/§8).
     // On copie pour éviter d'exposer/figer le buffer interne.
     ws.send(this.revealed.slice());
 
-    this.broadcastOnline(); // signale le nouvel arrivant aux autres
+    await this.reportOnline(); // signale le nouvel arrivant + diffuse le total global
   }
 
   /** paint : cooldown serveur -> révélation -> persistance -> broadcast (§4.4). */
-  private onPaint(ws: WebSocket, msg: PaintMsg): void {
+  private async onPaint(ws: WebSocket, msg: PaintMsg): Promise<void> {
     const identity = ws.deserializeAttachment() as Identity | null;
     if (!identity) return; // paint avant hello : ignoré
 
@@ -179,16 +189,50 @@ export class ArtworkRoom implements DurableObject {
     this.broadcast({ type: "painted", i, c, pseudo: identity.pseudo });
     this.broadcast({ type: "progress", revealed: this.revealedCount, total });
 
-    // 100% atteint : beat de complétion. Le coordinateur (phase 4) enchaînera le welcome suivant.
-    if (this.revealedCount === total) this.broadcast({ type: "completed" });
+    // 100% atteint : on prévient le coordinateur (il avance la frontière) AVANT le beat, pour
+    // que la reconnexion après le beat tombe sur le nouvel artwork (§4.7). Bascule = reconnexion :
+    // les sockets ne migrent pas entre DO, le client rouvre /ws et le coordinateur l'aiguille.
+    if (this.revealedCount === total) {
+      await this.notifyComplete();
+      this.broadcast({ type: "completed" });
+    }
   }
 
-  private online(): number {
-    return this.ctx.getWebSockets().length;
+  private localOnline(exclude?: WebSocket): number {
+    const all = this.ctx.getWebSockets();
+    return exclude ? all.filter((w) => w !== exclude).length : all.length;
   }
 
-  private broadcastOnline(): void {
-    this.broadcast({ type: "online", count: this.online() });
+  private coordinator(): DurableObjectStub {
+    return this.env.COORDINATOR.get(this.env.COORDINATOR.idFromName("singleton"));
+  }
+
+  /** Rapporte le nb de sockets de cette room au coordinateur, récupère le total global, diffuse. */
+  private async reportOnline(exclude?: WebSocket): Promise<void> {
+    const count = this.localOnline(exclude);
+    let total = count;
+    try {
+      const res = await this.coordinator().fetch("https://coordinator/online", {
+        method: "POST",
+        body: JSON.stringify({ roomKey: this.roomKey, count }),
+      });
+      total = ((await res.json()) as { total: number }).total;
+    } catch {
+      /* coordinateur indisponible : on retombe sur le compte local */
+    }
+    this.broadcast({ type: "online", count: total });
+  }
+
+  /** Signale au coordinateur que cette room a atteint 100% (il fait avancer la frontière). */
+  private async notifyComplete(): Promise<void> {
+    try {
+      await this.coordinator().fetch("https://coordinator/complete", {
+        method: "POST",
+        body: JSON.stringify({ roomKey: this.roomKey }),
+      });
+    } catch {
+      /* best-effort : si ça échoue, la frontière n'avance pas, pas de divergence d'état */
+    }
   }
 
   /** Diffuse un message JSON à tous les sockets de la room. */
