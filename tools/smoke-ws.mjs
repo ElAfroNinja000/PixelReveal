@@ -27,23 +27,29 @@ const send = (o) => ws.send(JSON.stringify(o));
 
 ws.on("open", () => send({ type: "hello", pseudo: "smoke", sessionId: SESSION }));
 
+let pxA = -1, pxB = -1;
+
 ws.on("message", (data, isBinary) => {
   if (isBinary) {
     snapshot = new Uint8Array(data);
+    // Choisit deux pixels NON révélés (robuste à l'état déjà entamé de la room).
+    for (let i = 0; i < snapshot.length && (pxA < 0 || pxB < 0); i++) {
+      if (snapshot[i] === 0xff) {
+        if (pxA < 0) pxA = i;
+        else pxB = i;
+      }
+    }
+    if (pxA < 0) return fail("aucun pixel non révélé (room déjà à 100%)");
+    send({ type: "paint", i: pxA }); // 1er clic : doit révéler
+    setTimeout(() => send({ type: "paint", i: pxB }), 50); // immédiat : rejeté par cooldown
+    setTimeout(() => send({ type: "paint", i: pxA }), 2100); // pixel figé : ignoré
+    setTimeout(() => finish(), 2600);
     return;
   }
   const msg = JSON.parse(data.toString());
   if (msg.type === "welcome") {
     welcome = msg;
     total = msg.progress.total;
-    // 1er clic sur un pixel non révélé
-    send({ type: "paint", i: 0 });
-    // 2e clic immédiat : doit être rejeté par le cooldown
-    setTimeout(() => send({ type: "paint", i: 1 }), 50);
-    // re-clic du pixel déjà révélé après cooldown : doit être ignoré (no painted)
-    setTimeout(() => send({ type: "paint", i: 0 }), 2100);
-    // fin du test
-    setTimeout(() => finish(), 2600);
   } else if (msg.type === "painted") {
     painted.push(msg);
   } else if (msg.type === "progress") {
@@ -60,7 +66,7 @@ function finish() {
   if (!snapshot || snapshot.length !== total) fail(`snapshot taille ${snapshot?.length} != ${total}`);
   if (welcome.palette?.length < 2) fail("palette vide");
   if (painted.length !== 1) fail(`painted attendu 1, reçu ${painted.length} (cooldown/figé KO)`);
-  if (painted[0].i !== 0) fail("painted index inattendu");
+  if (painted[0].i !== pxA) fail(`painted index ${painted[0].i} != ${pxA}`);
   if (!progress || progress.revealed < 1) fail("progress KO");
   if (cooldownRejects < 1) fail("aucun rejet cooldown détecté");
   console.log(

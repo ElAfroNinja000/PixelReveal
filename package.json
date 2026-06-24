@@ -5,9 +5,12 @@
   "description": "Canvas pixel art collaboratif temps réel sur Cloudflare Workers + Durable Objects",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --port 8787 --local",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
+    "smoke": "node tools/smoke-ws.mjs",
+    "smoke:reprise": "node tools/smoke-reprise.mjs",
+    "reset": "node -e \"require('fs').rmSync('.wrangler/state',{recursive:true,force:true})\"",
     "pages:deploy": "wrangler pages deploy ./public"
   },
   "devDependencies": {
