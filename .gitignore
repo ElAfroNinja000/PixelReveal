@@ -3,6 +3,10 @@ node_modules/
 .pnp
 .pnp.js
 
+# Python deps locales (Pillow installé hors site-packages, cf. pixelize.py)
+.pylibs/
+pip.pyz
+
 # Build / output
 dist/
 .wrangler/

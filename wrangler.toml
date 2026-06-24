@@ -1,0 +1,26 @@
+name = "pixelreveal"
+main = "worker/index.ts"          # routeur Worker — écrit en phase Room/Coordinateur
+compatibility_date = "2024-06-01"
+# Durable Objects = WebSocket Hibernation API → exige cette flag
+compatibility_flags = ["nodejs_compat"]
+
+# Sert les assets statiques (answer + palette des artworks) au Worker, côté serveur.
+# Jamais exposés tels quels au client : l'image reste secrète (cf. CLAUDE.md §4.3).
+[assets]
+directory = "./assets"
+binding = "ASSETS"
+
+# --- Durable Objects : un binding par rôle (cf. CLAUDE.md §4.1) ---
+# ARTWORK_ROOM : une instance par artwork (room). COORDINATOR : singleton pipeline.
+[[durable_objects.bindings]]
+name = "ARTWORK_ROOM"
+class_name = "ArtworkRoom"
+
+[[durable_objects.bindings]]
+name = "COORDINATOR"
+class_name = "Coordinator"
+
+# Migration initiale : déclare les classes DO (implémentées plus tard).
+[[migrations]]
+tag = "v1"
+new_classes = ["ArtworkRoom", "Coordinator"]
