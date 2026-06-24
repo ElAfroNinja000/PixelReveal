@@ -22,10 +22,12 @@ venv/
 *.log
 npm-debug.log*
 
-# Env
+# Env / secrets
 .env
 .env.*
 !.env.example
+# Contient les credentials Trello (token API) — ne jamais pousser sur le remote public
+.mcp.json
 
 # OS / editor
 .DS_Store
