@@ -12,9 +12,14 @@ import {
 
 /** Identité attachée à chaque socket, survit à l'hibernation via (de)serializeAttachment. */
 interface Identity {
+  ip: string;
   sessionId: string;
   pseudo: string;
 }
+
+/** Token bucket par IP (cf. ipBucket). */
+const IP_BURST = 5;
+const IP_REFILL_MS = 1000;
 
 /**
  * Durable Object : une room = un artwork (cf. §4.1).
@@ -38,6 +43,10 @@ export class ArtworkRoom implements DurableObject {
   private revealedCount = 0;
   private readonly cooldowns = new Map<string, number>(); // sessionId -> ts dernier clic accepté
   private readonly tally = new Map<string, number>(); // pseudo -> pixels révélés
+  // Rate-limit par IP : token bucket. Ferme le trou « 1 sessionId jetable par clic » d'un bot
+  // mono-IP (le cooldown par session ne suffit pas si le bot tourne les sessions). Bucket
+  // généreux pour ne pas pénaliser un NAT partagé : burst 5, recharge 1 jeton/s.
+  private readonly ipBucket = new Map<string, { tokens: number; ts: number }>();
 
   constructor(
     private readonly ctx: DurableObjectState,
@@ -99,6 +108,9 @@ export class ArtworkRoom implements DurableObject {
     }
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server); // hibernation : pas de handler en mémoire à garder vivant
+    // IP connue dès l'upgrade (header Cloudflare) ; stockée sur le socket pour le rate-limit.
+    const ip = req.headers.get("cf-connecting-ip") ?? "local";
+    server.serializeAttachment({ ip });
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -131,7 +143,8 @@ export class ArtworkRoom implements DurableObject {
 
   /** hello : enregistre l'identité puis envoie welcome (méta) + snapshot binaire. */
   private async onHello(ws: WebSocket, msg: HelloMsg): Promise<void> {
-    const identity: Identity = { sessionId: msg.sessionId, pseudo: msg.pseudo };
+    const prev = (ws.deserializeAttachment() as Partial<Identity> | null) ?? {};
+    const identity: Identity = { ip: prev.ip ?? "local", sessionId: msg.sessionId, pseudo: msg.pseudo };
     ws.serializeAttachment(identity); // réattaché automatiquement après hibernation
 
     const welcome: WelcomeMsg = {
@@ -171,6 +184,11 @@ export class ArtworkRoom implements DurableObject {
       // Pixel déjà figé (§2) : no-op, et on ne brûle pas le cooldown pour un clic inutile.
       return;
     }
+    if (!this.allowIp(identity.ip)) {
+      // Rate-limit IP dépassé : rejet (anti-bot multi-sessions mono-IP, §9).
+      ws.send(encode({ type: "cooldown", until: now + IP_REFILL_MS }));
+      return;
+    }
 
     // Révélation : la couleur vient de answer (vérité serveur), jamais du client.
     const c = this.answer[i];
@@ -204,6 +222,24 @@ export class ArtworkRoom implements DurableObject {
       .map(([pseudo, count]) => ({ pseudo, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
+  }
+
+  /** Token bucket par IP : true si un jeton est dispo (et le consomme), false sinon. */
+  private allowIp(ip: string): boolean {
+    const now = Date.now();
+    let b = this.ipBucket.get(ip);
+    if (!b) {
+      b = { tokens: IP_BURST, ts: now };
+      this.ipBucket.set(ip, b);
+    }
+    const refill = Math.floor((now - b.ts) / IP_REFILL_MS);
+    if (refill > 0) {
+      b.tokens = Math.min(IP_BURST, b.tokens + refill);
+      b.ts = now;
+    }
+    if (b.tokens <= 0) return false;
+    b.tokens--;
+    return true;
   }
 
   private localOnline(exclude?: WebSocket): number {
