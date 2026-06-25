@@ -26,6 +26,8 @@ export interface HelloMsg {
   pseudo: string;
   /** Généré côté client, persisté en localStorage. Porte le cooldown, suit le joueur. */
   sessionId: string;
+  /** Spectateur : connecté mais ne peint pas (post-MVP). */
+  spectate?: boolean;
 }
 
 /** Tente de révéler le pixel d'index `i` (row-major). Le serveur arbitre cooldown + validité. */
@@ -34,7 +36,14 @@ export interface PaintMsg {
   i: number;
 }
 
-export type ClientMessage = HelloMsg | PaintMsg;
+/** Position du curseur (coords normalisées 0..1), relayée aux autres joueurs (post-MVP). */
+export interface CursorMsg {
+  type: "cursor";
+  x: number;
+  y: number;
+}
+
+export type ClientMessage = HelloMsg | PaintMsg | CursorMsg;
 
 /* ------------------------------------------------------------------ */
 /* Serveur → Client                                                    */
@@ -93,6 +102,30 @@ export interface OnlineMsg {
   count: number;
 }
 
+/** Contribution perso du joueur sur l'artwork courant (post-MVP). */
+export interface MineMsg {
+  type: "mine";
+  count: number;
+}
+
+/** Curseur d'un autre joueur, relayé (coords normalisées 0..1). `id` = sessionId tronqué. */
+export interface CursorBroadcastMsg {
+  type: "cursor";
+  id: string;
+  pseudo: string;
+  x: number;
+  y: number;
+}
+
+/** Entrée de galerie : une œuvre terminée (post-MVP). */
+export interface GalleryEntry {
+  key: string; // roomKey "artwork-001#0"
+  artworkId: string;
+  width: number;
+  height: number;
+  ts: number; // date de complétion (ms epoch)
+}
+
 /** Ack/rejet d'un `paint`. `until` = timestamp (ms) avant lequel le prochain clic est refusé. */
 export interface CooldownMsg {
   type: "cooldown";
@@ -105,6 +138,8 @@ export type ServerMessage =
   | ProgressMsg
   | CompletedMsg
   | OnlineMsg
+  | MineMsg
+  | CursorBroadcastMsg
   | CooldownMsg;
 
 /* ------------------------------------------------------------------ */

@@ -10,6 +10,13 @@ function coordinator(env: Env): DurableObjectStub {
   return env.COORDINATOR.get(env.COORDINATOR.idFromName(SINGLETON));
 }
 
+/** Recopie une réponse en ajoutant un CORS ouvert (galerie publique, lecture seule). */
+function cors(res: Response): Response {
+  const out = new Response(res.body, res);
+  out.headers.set("access-control-allow-origin", "*");
+  return out;
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
@@ -24,6 +31,15 @@ export default {
       target.searchParams.set("room", roomKey);
       const room = env.ARTWORK_ROOM.get(env.ARTWORK_ROOM.idFromName(roomKey));
       return room.fetch(new Request(target, req));
+    }
+
+    // Galerie publique (œuvres terminées) — lecture seule. L'écriture reste interne (room->coord).
+    // CORS ouvert : le front (Pages, autre origin) lit la galerie depuis le navigateur.
+    if (url.pathname === "/gallery" && req.method === "GET") {
+      return cors(await coordinator(env).fetch("https://coordinator/gallery"));
+    }
+    if (url.pathname === "/gallery/item" && req.method === "GET") {
+      return cors(await coordinator(env).fetch("https://coordinator/gallery/item" + url.search));
     }
 
     // Routes de diagnostic — uniquement en dev (npm run dev passe --var ENVIRONMENT:dev).

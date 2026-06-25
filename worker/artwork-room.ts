@@ -5,6 +5,7 @@ import {
   UNREVEALED,
   encode,
   type ClientMessage,
+  type CursorMsg,
   type HelloMsg,
   type PaintMsg,
   type WelcomeMsg,
@@ -15,6 +16,7 @@ interface Identity {
   ip: string;
   sessionId: string;
   pseudo: string;
+  spectate?: boolean;
 }
 
 /** Token bucket par IP (cf. ipBucket). */
@@ -125,6 +127,7 @@ export class ArtworkRoom implements DurableObject {
     }
     if (msg.type === "hello") await this.onHello(ws, msg);
     else if (msg.type === "paint") await this.onPaint(ws, msg);
+    else if (msg.type === "cursor") this.onCursor(ws, msg);
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
@@ -144,7 +147,12 @@ export class ArtworkRoom implements DurableObject {
   /** hello : enregistre l'identité puis envoie welcome (méta) + snapshot binaire. */
   private async onHello(ws: WebSocket, msg: HelloMsg): Promise<void> {
     const prev = (ws.deserializeAttachment() as Partial<Identity> | null) ?? {};
-    const identity: Identity = { ip: prev.ip ?? "local", sessionId: msg.sessionId, pseudo: msg.pseudo };
+    const identity: Identity = {
+      ip: prev.ip ?? "local",
+      sessionId: msg.sessionId,
+      pseudo: msg.pseudo,
+      spectate: msg.spectate === true,
+    };
     ws.serializeAttachment(identity); // réattaché automatiquement après hibernation
 
     const welcome: WelcomeMsg = {
@@ -160,6 +168,7 @@ export class ArtworkRoom implements DurableObject {
     // Snapshot = un octet par pixel, en frame binaire (jamais en JSON, trop gros — §6/§8).
     // On copie pour éviter d'exposer/figer le buffer interne.
     ws.send(this.revealed.slice());
+    ws.send(encode({ type: "mine", count: this.tally.get(msg.pseudo) ?? 0 })); // contribution restaurée
 
     await this.reportOnline(); // signale le nouvel arrivant + diffuse le total global
   }
@@ -168,6 +177,7 @@ export class ArtworkRoom implements DurableObject {
   private async onPaint(ws: WebSocket, msg: PaintMsg): Promise<void> {
     const identity = ws.deserializeAttachment() as Identity | null;
     if (!identity) return; // paint avant hello : ignoré
+    if (identity.spectate) return; // spectateur : ne peint pas (post-MVP)
 
     const total = this.width * this.height;
     const i = msg.i;
@@ -202,8 +212,9 @@ export class ArtworkRoom implements DurableObject {
     void this.ctx.storage.put(`px:${i}`, c);
     void this.ctx.storage.put(`ty:${identity.pseudo}`, n);
 
-    // Ack au cliqueur + diffusion du delta et de la progression à toute la room.
+    // Ack au cliqueur (+ sa contribution perso) + diffusion du delta et de la progression.
     ws.send(encode({ type: "cooldown", until: now + COOLDOWN_MS }));
+    ws.send(encode({ type: "mine", count: n }));
     this.broadcast({ type: "painted", i, c, pseudo: identity.pseudo });
     this.broadcast({ type: "progress", revealed: this.revealedCount, total });
 
@@ -212,7 +223,46 @@ export class ArtworkRoom implements DurableObject {
     // les sockets ne migrent pas entre DO, le client rouvre /ws et le coordinateur l'aiguille.
     if (this.revealedCount === total) {
       await this.notifyComplete();
+      await this.saveGallery(); // l'œuvre est complète → archivable (image désormais publique)
       this.broadcast({ type: "completed", ranking: this.ranking() });
+    }
+  }
+
+  /** Relaie le curseur d'un joueur aux autres (coords normalisées, post-MVP). */
+  private onCursor(ws: WebSocket, msg: CursorMsg): void {
+    const identity = ws.deserializeAttachment() as Identity | null;
+    if (!identity) return;
+    const x = Math.min(1, Math.max(0, msg.x));
+    const y = Math.min(1, Math.max(0, msg.y));
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const out = encode({ type: "cursor", id: identity.sessionId.slice(0, 8), pseudo: identity.pseudo, x, y });
+    for (const peer of this.ctx.getWebSockets()) {
+      if (peer !== ws) {
+        try {
+          peer.send(out);
+        } catch {
+          /* socket fermant */
+        }
+      }
+    }
+  }
+
+  /** Archive l'œuvre terminée dans la galerie (côté coordinateur). Best-effort. */
+  private async saveGallery(): Promise<void> {
+    try {
+      await this.coordinator().fetch("https://coordinator/gallery", {
+        method: "POST",
+        body: JSON.stringify({
+          key: this.roomKey,
+          artworkId: this.artworkId,
+          width: this.width,
+          height: this.height,
+          palette: this.palette,
+          answer: [...this.answer], // image complète : publique une fois l'œuvre finie
+        }),
+      });
+    } catch {
+      /* galerie indisponible : non bloquant */
     }
   }
 

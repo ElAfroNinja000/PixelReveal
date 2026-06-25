@@ -24,6 +24,7 @@ function uuid() {
 let sessionId = load("pixelreveal.sessionId");
 if (!sessionId) { sessionId = uuid(); store("pixelreveal.sessionId", sessionId); }
 let pseudo = load("pixelreveal.pseudo") || "";
+let spectate = false;
 $("pseudo").value = pseudo;
 
 // --- État de rendu ---
@@ -88,7 +89,7 @@ function tickCooldown() {
 function connect() {
   ws = new WebSocket(WS_URL);
   ws.binaryType = "arraybuffer";
-  ws.onopen = () => ws.send(JSON.stringify({ type: "hello", pseudo, sessionId }));
+  ws.onopen = () => ws.send(JSON.stringify({ type: "hello", pseudo, sessionId, spectate }));
   ws.onmessage = onMessage;
   ws.onclose = () => { $("online").textContent = "0"; };
 }
@@ -114,9 +115,30 @@ function onMessage(ev) {
       break;
     case "progress": setProgress(m.revealed, m.total); break;
     case "online": $("online").textContent = m.count; break;
+    case "mine": $("mine").textContent = m.count; break; // contribution perso
+    case "cursor": showCursor(m); break; // curseur d'un autre joueur
     case "cooldown": cooldownUntil = m.until; tickCooldown(); break;
     case "completed": onCompleted(m.ranking || []); break;
   }
+}
+
+// --- Curseurs live des autres joueurs (overlay DOM, % du canvas) ---
+const cursors = new Map(); // id -> { el, timer }
+function showCursor(m) {
+  let c = cursors.get(m.id);
+  if (!c) {
+    const el = document.createElement("div");
+    el.className = "cur";
+    el.innerHTML = "<span></span>";
+    $("cursors").appendChild(el);
+    c = { el };
+    cursors.set(m.id, c);
+  }
+  c.el.querySelector("span").textContent = m.pseudo;
+  c.el.style.left = m.x * 100 + "%";
+  c.el.style.top = m.y * 100 + "%";
+  clearTimeout(c.timer);
+  c.timer = setTimeout(() => { c.el.remove(); cursors.delete(m.id); }, 3000); // purge si inactif
 }
 
 // --- Beat de complétion + bascule partagée (reconnexion) (cf. §4.7) ---
@@ -141,6 +163,7 @@ const esc = (s) => s.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": 
 $("loginForm").addEventListener("submit", (e) => {
   e.preventDefault();
   pseudo = $("pseudo").value.trim() || "anon";
+  spectate = $("spectate").checked;
   store("pixelreveal.pseudo", pseudo);
   $("login").hidden = true;
   $("hud").hidden = false;
@@ -151,10 +174,33 @@ $("loginForm").addEventListener("submit", (e) => {
 $("next").addEventListener("click", advance);
 
 $("cv").addEventListener("click", (e) => {
-  if (!ws || ws.readyState !== 1 || Date.now() < cooldownUntil) return;
+  if (spectate || !ws || ws.readyState !== 1 || Date.now() < cooldownUntil) return;
   const r = e.currentTarget.getBoundingClientRect();
   const x = Math.floor(((e.clientX - r.left) / r.width) * W);
   const y = Math.floor(((e.clientY - r.top) / r.height) * H);
   if (x < 0 || y < 0 || x >= W || y >= H) return;
   ws.send(JSON.stringify({ type: "paint", i: y * W + x }));
+});
+
+// Curseur live : envoi throttlé (~16/s) en coords normalisées.
+let lastCursor = 0;
+$("cv").addEventListener("mousemove", (e) => {
+  if (!ws || ws.readyState !== 1) return;
+  const now = performance.now();
+  if (now - lastCursor < 60) return;
+  lastCursor = now;
+  const r = e.currentTarget.getBoundingClientRect();
+  ws.send(JSON.stringify({ type: "cursor", x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }));
+});
+
+// Partage social : lien zéro friction (copie presse-papier).
+$("share").addEventListener("click", async () => {
+  const btn = $("share");
+  try {
+    await navigator.clipboard.writeText(location.href);
+    btn.textContent = "Lien copié ✓";
+  } catch {
+    prompt("Copie le lien :", location.href);
+  }
+  setTimeout(() => (btn.textContent = "Partager"), 1500);
 });

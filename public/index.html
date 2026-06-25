@@ -16,6 +16,8 @@
         <input id="pseudo" maxlength="20" placeholder="ton pseudo" autocomplete="off" required />
         <button type="submit">Jouer</button>
       </form>
+      <label class="spectate"><input type="checkbox" id="spectate" /> Mode spectateur (regarder sans peindre)</label>
+      <p class="muted"><a href="gallery.html">Voir la galerie des œuvres terminées →</a></p>
     </div>
   </div>
 
@@ -23,15 +25,19 @@
   <header id="hud" hidden>
     <span class="dot"></span>
     <span><b id="online">0</b> en ligne</span>
+    <span class="sep">·</span>
+    <span>toi <b id="mine">0</b></span>
     <div id="bar"><div id="fill"></div></div>
     <span id="pct">0%</span>
     <span id="cool" class="cool"></span>
+    <button id="share" title="Copier le lien">Partager</button>
   </header>
 
   <main id="stage" hidden>
     <div id="wrap">
       <canvas id="cv" width="1" height="1"></canvas>
       <canvas id="fx" width="1" height="1"></canvas>
+      <div id="cursors"></div>
     </div>
   </main>
 

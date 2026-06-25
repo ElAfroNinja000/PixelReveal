@@ -95,6 +95,18 @@ button:hover { filter: brightness(1.08); }
 #cv { cursor: crosshair; }
 #cv.cooling { cursor: progress; }
 
+/* Curseurs des autres joueurs (overlay DOM, labels lisibles) */
+#cursors { position: absolute; inset: 0; pointer-events: none; }
+.cur { position: absolute; transform: translate(-50%, -50%); transition: left 0.08s linear, top 0.08s linear; }
+.cur::before { content: ""; position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.cur span { position: absolute; left: 8px; top: -6px; font-size: 11px; background: rgba(0,0,0,0.6); padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
+
+/* HUD extras */
+.sep { color: #444; }
+#share { padding: 5px 10px; font-size: 13px; }
+.spectate { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; font-size: 13px; color: var(--muted); }
+.spectate input { flex: none; }
+
 /* Flash global à 100% (cf. §8 : flash à 100%). */
 body.flash::after {
   content: "";
@@ -111,3 +123,10 @@ body.flash::after {
 #ranking li { padding: 2px 0; }
 #ranking li b { color: var(--accent); }
 [hidden] { display: none !important; }
+
+/* Galerie */
+#grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; padding: 16px; max-width: 900px; margin: 0 auto; }
+.gcard { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.thumb { image-rendering: pixelated; width: 100%; height: auto; border-radius: 6px; display: block; }
+.gcard figcaption { margin-top: 8px; font-size: 12px; color: var(--muted); }
+#hud a { color: var(--accent); text-decoration: none; }

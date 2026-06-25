@@ -18,6 +18,15 @@ interface Frontier {
   lap: number;
 }
 
+/** Méta d'une œuvre archivée (l'image complète est stockée à part sous gal:<key>). */
+interface GalleryMeta {
+  key: string;
+  artworkId: string;
+  width: number;
+  height: number;
+  ts: number;
+}
+
 function roomKeyOf(f: Frontier): string {
   return `${PIPELINE.artworks[f.index]}#${f.lap}`;
 }
@@ -71,6 +80,34 @@ export class Coordinator implements DurableObject {
       let total = 0;
       for (const n of this.onlineByRoom.values()) total += n;
       return Response.json({ total });
+    }
+
+    // --- Galerie des œuvres terminées (post-MVP) ---
+    // Méta listée sous "gallery" (cap 50) ; image complète sous gal:<key>. Public (œuvre finie).
+    if (url.pathname === "/gallery" && req.method === "POST") {
+      const e = (await req.json()) as {
+        key: string; artworkId: string; width: number; height: number; palette: string[]; answer: number[];
+      };
+      await this.ctx.storage.put(`gal:${e.key}`, e);
+      const list = (await this.ctx.storage.get<GalleryMeta[]>("gallery")) ?? [];
+      if (!list.some((m) => m.key === e.key)) {
+        list.unshift({ key: e.key, artworkId: e.artworkId, width: e.width, height: e.height, ts: Date.now() });
+        while (list.length > 50) {
+          const drop = list.pop();
+          if (drop) await this.ctx.storage.delete(`gal:${drop.key}`);
+        }
+        await this.ctx.storage.put("gallery", list);
+      }
+      return Response.json({ ok: true });
+    }
+    if (url.pathname === "/gallery" && req.method === "GET") {
+      return Response.json((await this.ctx.storage.get<GalleryMeta[]>("gallery")) ?? []);
+    }
+    if (url.pathname === "/gallery/item") {
+      const key = url.searchParams.get("key");
+      const item = key ? await this.ctx.storage.get(`gal:${key}`) : null;
+      if (!item) return new Response("not found", { status: 404 });
+      return Response.json(item);
     }
 
     return new Response("not found", { status: 404 });
