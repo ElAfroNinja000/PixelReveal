@@ -226,16 +226,29 @@ $("cv").addEventListener("click", (e) => {
   ws.send(JSON.stringify({ type: "paint", i: y * W + x }));
 });
 
-// Curseur live : envoi throttlé (~16/s) en coords normalisées.
+// Box du pixel visé : mise à jour à chaque move (non throttlée pour rester fluide).
 let lastCursor = 0;
 $("cv").addEventListener("mousemove", (e) => {
+  const r = e.currentTarget.getBoundingClientRect();
+  const nx = (e.clientX - r.left) / r.width, ny = (e.clientY - r.top) / r.height;
+  if (W > 0) {
+    const px = Math.min(W - 1, Math.max(0, Math.floor(nx * W)));
+    const py = Math.min(H - 1, Math.max(0, Math.floor(ny * H)));
+    const aim = $("aim");
+    aim.style.left = (px / W) * 100 + "%";
+    aim.style.top = (py / H) * 100 + "%";
+    aim.style.width = (1 / W) * 100 + "%";
+    aim.style.height = (1 / H) * 100 + "%";
+    aim.hidden = false;
+  }
+  // Curseur live : envoi throttlé (~16/s) en coords normalisées.
   if (!ws || ws.readyState !== 1) return;
   const now = performance.now();
   if (now - lastCursor < 60) return;
   lastCursor = now;
-  const r = e.currentTarget.getBoundingClientRect();
-  ws.send(JSON.stringify({ type: "cursor", x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }));
+  ws.send(JSON.stringify({ type: "cursor", x: nx, y: ny }));
 });
+$("cv").addEventListener("mouseleave", () => { $("aim").hidden = true; });
 
 // Partage social : lien zéro friction (copie presse-papier).
 $("share").addEventListener("click", async () => {

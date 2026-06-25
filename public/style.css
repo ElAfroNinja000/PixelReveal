@@ -95,6 +95,9 @@ button:hover { filter: brightness(1.08); }
 #cv { cursor: crosshair; }
 #cv.cooling { cursor: progress; }
 
+/* Box du pixel visé par le curseur (overlay dans #wrap -> suit le zoom, aligné pixel) */
+#aim { position: absolute; box-sizing: border-box; border: 2px solid rgba(255,255,255,0.9); pointer-events: none; mix-blend-mode: difference; }
+
 /* Curseurs des autres joueurs (overlay DOM, labels lisibles) */
 #cursors { position: absolute; inset: 0; pointer-events: none; }
 .cur { position: absolute; transform: translate(-50%, -50%); transition: left 0.08s linear, top 0.08s linear; }
