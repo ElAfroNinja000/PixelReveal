@@ -106,6 +106,7 @@ function onMessage(ev) {
       drawSnapshot(new Uint8Array(total).fill(UNREVEALED)); // noir en attendant le snapshot binaire
       setProgress(m.progress.revealed, m.progress.total);
       $("online").textContent = m.online;
+      resetZoom(); // nouvel artwork -> on recadre
       break;
     }
     case "painted":
@@ -173,7 +174,48 @@ $("loginForm").addEventListener("submit", (e) => {
 
 $("next").addEventListener("click", advance);
 
+// --- Zoom molette + pan (front, n'altère pas le mapping clic : getBoundingClientRect suit le transform) ---
+let scale = 1, tx = 0, ty = 0;
+let panning = false, panned = false, startX = 0, startY = 0, baseTx = 0, baseTy = 0;
+const wrap = $("wrap");
+
+function applyTransform() {
+  wrap.style.transform = scale === 1 ? "" : `translate(${tx}px, ${ty}px) scale(${scale})`;
+}
+function resetZoom() { scale = 1; tx = 0; ty = 0; applyTransform(); }
+
+wrap.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  // Point fixe sous le curseur (origin 0,0 : le coin haut-gauche du wrap = rect - translate).
+  const r = wrap.getBoundingClientRect();
+  const baseL = r.left - tx, baseT = r.top - ty;
+  const mx = e.clientX - baseL, my = e.clientY - baseT;
+  const cx = (mx - tx) / scale, cy = (my - ty) / scale;
+  const ns = Math.min(8, Math.max(1, scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+  tx = mx - cx * ns;
+  ty = my - cy * ns;
+  scale = ns;
+  if (scale === 1) { tx = 0; ty = 0; }
+  applyTransform();
+}, { passive: false });
+
+// Pan par glissé quand zoomé (sans déclencher un paint : flag panned).
+wrap.addEventListener("mousedown", (e) => {
+  if (scale <= 1) return;
+  panning = true; panned = false;
+  startX = e.clientX; startY = e.clientY; baseTx = tx; baseTy = ty;
+});
+window.addEventListener("mousemove", (e) => {
+  if (!panning) return;
+  const dx = e.clientX - startX, dy = e.clientY - startY;
+  if (Math.abs(dx) + Math.abs(dy) > 4) panned = true;
+  tx = baseTx + dx; ty = baseTy + dy;
+  applyTransform();
+});
+window.addEventListener("mouseup", () => { panning = false; });
+
 $("cv").addEventListener("click", (e) => {
+  if (panned) { panned = false; return; } // c'était un pan, pas un clic
   if (spectate || !ws || ws.readyState !== 1 || Date.now() < cooldownUntil) return;
   const r = e.currentTarget.getBoundingClientRect();
   const x = Math.floor(((e.clientX - r.left) / r.width) * W);

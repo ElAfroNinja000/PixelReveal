@@ -81,8 +81,8 @@ button:hover { filter: brightness(1.08); }
 .cool { color: #e8a23a; font-variant-numeric: tabular-nums; min-width: 64px; }
 
 /* --- Canvas --- */
-#stage { padding: 8px 16px 24px; width: 100%; display: flex; justify-content: center; }
-#wrap { position: relative; line-height: 0; }
+#stage { padding: 8px 16px 24px; width: 100%; display: flex; justify-content: center; overflow: hidden; }
+#wrap { position: relative; line-height: 0; transform-origin: 0 0; will-change: transform; }
 #cv, #fx {
   /* Pixels nets, jamais de lissage (cf. §8). Taille réelle = grille, agrandie en CSS. */
   image-rendering: pixelated;
