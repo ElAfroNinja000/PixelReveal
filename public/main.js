@@ -166,6 +166,8 @@ $("loginForm").addEventListener("submit", (e) => {
   pseudo = $("pseudo").value.trim() || "anon";
   spectate = $("spectate").checked;
   store("pixelreveal.pseudo", pseudo);
+  $("meName").textContent = pseudo; // libellé contribution = pseudo ([Pseudo] : N pixels)
+  $("meName").textContent = pseudo; // HUD : "[Pseudo] : N pixels"
   $("login").hidden = true;
   $("hud").hidden = false;
   $("stage").hidden = false;

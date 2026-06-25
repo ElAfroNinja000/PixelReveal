@@ -10,14 +10,14 @@
   <!-- Écran pseudo : 1 champ, stocké en localStorage (cf. §8). -->
   <div id="login" class="overlay">
     <div class="card">
-      <h1>PixelReveal</h1>
-      <p class="muted">Clique des pixels. Révèle l'image. Ensemble.</p>
+      <h1>Pixel Reveal</h1>
+      <p class="muted">Click on pixels, reveal images, enjoy together.</p>
       <form id="loginForm">
         <input id="pseudo" maxlength="20" placeholder="ton pseudo" autocomplete="off" required />
-        <button type="submit">Jouer</button>
+        <button type="submit">Play</button>
       </form>
-      <label class="spectate"><input type="checkbox" id="spectate" /> Mode spectateur (regarder sans peindre)</label>
-      <p class="muted"><a href="gallery.html">Voir la galerie des œuvres terminées →</a></p>
+      <label class="spectate"><input type="checkbox" id="spectate" /> Spectate</label>
+      <p class="muted"><a href="gallery.html">Galery</a></p>
     </div>
   </div>
 
@@ -26,7 +26,7 @@
     <span class="dot"></span>
     <span><b id="online">0</b> en ligne</span>
     <span class="sep">·</span>
-    <span>toi <b id="mine">0</b></span>
+    <span><b id="meName">toi</b> : <b id="mine">0</b> pixels</span>
     <div id="bar"><div id="fill"></div></div>
     <span id="pct">0%</span>
     <span id="cool" class="cool"></span>

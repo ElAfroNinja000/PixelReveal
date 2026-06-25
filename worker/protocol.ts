@@ -14,7 +14,7 @@
 export const UNREVEALED = 0xff;
 
 /** Cooldown serveur, en millisecondes. Arbitré côté DO (cf. §4.4). Pièce maîtresse anti-bot. */
-export const COOLDOWN_MS = 2000;
+export const COOLDOWN_MS = 1200;
 
 /* ------------------------------------------------------------------ */
 /* Client → Serveur                                                    */
