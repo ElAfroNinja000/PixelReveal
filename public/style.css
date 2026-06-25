@@ -95,8 +95,9 @@ button:hover { filter: brightness(1.08); }
 #cv { cursor: crosshair; }
 #cv.cooling { cursor: progress; }
 
-/* Box du pixel visé par le curseur (overlay dans #wrap -> suit le zoom, aligné pixel) */
-#aim { position: absolute; box-sizing: border-box; border: 2px solid rgba(255,255,255,0.9); pointer-events: none; mix-blend-mode: difference; }
+/* Box du pixel visé : position fixed, dimensionnée en px = taille réelle d'une cellule.
+   Hors du wrap transformé -> la bordure ne grossit pas avec le zoom. */
+#aim { position: fixed; box-sizing: border-box; border: 1.5px solid rgba(255,255,255,0.9); pointer-events: none; mix-blend-mode: difference; z-index: 5; }
 
 /* Curseurs des autres joueurs (overlay DOM, labels lisibles) */
 #cursors { position: absolute; inset: 0; pointer-events: none; }

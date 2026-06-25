@@ -37,7 +37,6 @@
     <div id="wrap">
       <canvas id="cv" width="1" height="1"></canvas>
       <canvas id="fx" width="1" height="1"></canvas>
-      <div id="aim" hidden></div>
       <div id="cursors"></div>
     </div>
   </main>
@@ -51,6 +50,9 @@
       <button id="next">Continuer</button>
     </div>
   </div>
+
+  <!-- Box du pixel visé : hors #wrap (non transformé), dimensionnée en px (taille réelle 1 cellule). -->
+  <div id="aim" hidden></div>
 
   <script src="main.js" type="module"></script>
 </body>

@@ -232,13 +232,15 @@ $("cv").addEventListener("mousemove", (e) => {
   const r = e.currentTarget.getBoundingClientRect();
   const nx = (e.clientX - r.left) / r.width, ny = (e.clientY - r.top) / r.height;
   if (W > 0) {
+    // Taille réelle d'une cellule à l'écran (suit le zoom via r) ; placée en coords viewport.
+    const cw = r.width / W, ch = r.height / H;
     const px = Math.min(W - 1, Math.max(0, Math.floor(nx * W)));
     const py = Math.min(H - 1, Math.max(0, Math.floor(ny * H)));
     const aim = $("aim");
-    aim.style.left = (px / W) * 100 + "%";
-    aim.style.top = (py / H) * 100 + "%";
-    aim.style.width = (1 / W) * 100 + "%";
-    aim.style.height = (1 / H) * 100 + "%";
+    aim.style.left = r.left + px * cw + "px";
+    aim.style.top = r.top + py * ch + "px";
+    aim.style.width = cw + "px";
+    aim.style.height = ch + "px";
     aim.hidden = false;
   }
   // Curseur live : envoi throttlé (~16/s) en coords normalisées.
