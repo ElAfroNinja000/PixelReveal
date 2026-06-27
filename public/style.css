@@ -108,7 +108,6 @@ button:hover { filter: brightness(1.08); }
 #share { padding: 5px 10px; font-size: 13px; }
 .spectate { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; font-size: 13px; color: var(--muted); }
 .spectate input { flex: none; }
-.gallery-btn { display: inline-block; margin-top: 12px; text-decoration: none; }
 
 /* Flash global à 100% (cf. §8 : flash à 100%). */
 body.flash::after {
