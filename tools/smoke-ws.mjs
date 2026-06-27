@@ -51,11 +51,11 @@ ws.on("message", (data, isBinary) => {
     welcome = msg;
     total = msg.progress.total;
   } else if (msg.type === "painted") {
-    painted.push(msg);
+    if (msg.pseudo === "smoke") painted.push(msg); // ignore les pixels du bot
   } else if (msg.type === "progress") {
     progress = msg;
   } else if (msg.type === "cooldown") {
-    if (msg.until > Date.now() + 1000) cooldownRejects++; // un rejet repousse ~2s
+    if (msg.until > Date.now() + 400) cooldownRejects++; // cooldown actif (ack ou rejet)
   }
 });
 

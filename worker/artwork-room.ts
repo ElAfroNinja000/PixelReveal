@@ -23,6 +23,9 @@ interface Identity {
 const IP_BURST = 5;
 const IP_REFILL_MS = 1000;
 
+/** Joueur bot : révèle 1 pixel par tick (via DO alarm). Dort si aucun joueur connecté. */
+const BOT_INTERVAL_MS = 1500;
+
 /**
  * Durable Object : une room = un artwork (cf. §4.1).
  *
@@ -49,6 +52,7 @@ export class ArtworkRoom implements DurableObject {
   // mono-IP (le cooldown par session ne suffit pas si le bot tourne les sessions). Bucket
   // généreux pour ne pas pénaliser un NAT partagé : burst 5, recharge 1 jeton/s.
   private readonly ipBucket = new Map<string, { tokens: number; ts: number }>();
+  private botName = ""; // pseudo auto du joueur bot (persisté)
 
   constructor(
     private readonly ctx: DurableObjectState,
@@ -97,6 +101,14 @@ export class ArtworkRoom implements DurableObject {
       // Reprise du classement (clé `ty:<pseudo>` -> compteur).
       const ty = await this.ctx.storage.list<number>({ prefix: "ty:" });
       for (const [key, n] of ty) this.tally.set(key.slice(3), n);
+
+      // Pseudo auto du bot, stable sur la durée de vie de la room.
+      let bn = await this.ctx.storage.get<string>("botName");
+      if (!bn) {
+        bn = `🤖 Bot${Math.floor(1000 + Math.random() * 9000)}`;
+        await this.ctx.storage.put("botName", bn);
+      }
+      this.botName = bn;
 
       this.loaded = true;
     });
@@ -171,6 +183,7 @@ export class ArtworkRoom implements DurableObject {
     ws.send(encode({ type: "mine", count: this.tally.get(msg.pseudo) ?? 0 })); // contribution restaurée
 
     await this.reportOnline(); // signale le nouvel arrivant + diffuse le total global
+    await this.ensureBotAlarm(); // un joueur est là -> le bot peut jouer
   }
 
   /** paint : cooldown serveur -> révélation -> persistance -> broadcast (§4.4). */
@@ -200,32 +213,61 @@ export class ArtworkRoom implements DurableObject {
       return;
     }
 
-    // Révélation : la couleur vient de answer (vérité serveur), jamais du client.
+    // Révélation (cœur partagé joueur/bot) + ack cooldown + contribution perso.
+    this.cooldowns.set(identity.sessionId, now);
+    const n = await this.applyReveal(i, identity.pseudo);
+    ws.send(encode({ type: "cooldown", until: now + COOLDOWN_MS }));
+    ws.send(encode({ type: "mine", count: n }));
+  }
+
+  /** Cœur de la révélation, partagé entre clic joueur et tick bot : fige le pixel, maj tally,
+   * persiste, diffuse painted/progress, gère la complétion (§4.7). Renvoie le total du pseudo. */
+  private async applyReveal(i: number, pseudo: string): Promise<number> {
+    const total = this.width * this.height;
     const c = this.answer[i];
     this.revealed[i] = c;
     this.revealedCount++;
-    this.cooldowns.set(identity.sessionId, now);
-    const n = (this.tally.get(identity.pseudo) ?? 0) + 1;
-    this.tally.set(identity.pseudo, n);
-
-    // Persistance incrémentale : un petit put par pixel plutôt que réécrire 90k octets/clic.
+    const n = (this.tally.get(pseudo) ?? 0) + 1;
+    this.tally.set(pseudo, n);
     void this.ctx.storage.put(`px:${i}`, c);
-    void this.ctx.storage.put(`ty:${identity.pseudo}`, n);
-
-    // Ack au cliqueur (+ sa contribution perso) + diffusion du delta et de la progression.
-    ws.send(encode({ type: "cooldown", until: now + COOLDOWN_MS }));
-    ws.send(encode({ type: "mine", count: n }));
-    this.broadcast({ type: "painted", i, c, pseudo: identity.pseudo });
+    void this.ctx.storage.put(`ty:${pseudo}`, n);
+    this.broadcast({ type: "painted", i, c, pseudo });
     this.broadcast({ type: "progress", revealed: this.revealedCount, total });
-
-    // 100% atteint : on prévient le coordinateur (il avance la frontière) AVANT le beat, pour
-    // que la reconnexion après le beat tombe sur le nouvel artwork (§4.7). Bascule = reconnexion :
-    // les sockets ne migrent pas entre DO, le client rouvre /ws et le coordinateur l'aiguille.
     if (this.revealedCount === total) {
       await this.notifyComplete();
-      await this.saveGallery(); // l'œuvre est complète → archivable (image désormais publique)
+      await this.saveGallery();
       this.broadcast({ type: "completed", ranking: this.ranking() });
     }
+    return n;
+  }
+
+  /** Index d'un pixel non révélé au hasard, ou -1 si l'artwork est complet. */
+  private pickUnrevealed(): number {
+    const total = this.width * this.height;
+    if (this.revealedCount >= total) return -1;
+    const start = Math.floor(Math.random() * total);
+    for (let k = 0; k < total; k++) {
+      const j = (start + k) % total;
+      if (this.revealed[j] === UNREVEALED) return j;
+    }
+    return -1;
+  }
+
+  /** Programme le prochain tick du bot s'il n'y en a pas déjà un et que l'artwork n'est pas fini. */
+  private async ensureBotAlarm(): Promise<void> {
+    if (this.revealedCount >= this.width * this.height) return;
+    if ((await this.ctx.storage.getAlarm()) === null) {
+      await this.ctx.storage.setAlarm(Date.now() + BOT_INTERVAL_MS);
+    }
+  }
+
+  /** Tick du bot : révèle 1 pixel sous le pseudo bot. Dort si aucun joueur n'est connecté. */
+  async alarm(): Promise<void> {
+    await this.init();
+    if (this.ctx.getWebSockets().length === 0) return; // pas de joueur -> bot en pause
+    const i = this.pickUnrevealed();
+    if (i >= 0) await this.applyReveal(i, this.botName);
+    await this.ensureBotAlarm(); // reprogramme le tick suivant
   }
 
   /** Relaie le curseur d'un joueur aux autres (coords normalisées, post-MVP). */
