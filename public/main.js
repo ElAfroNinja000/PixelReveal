@@ -245,11 +245,17 @@ const SFX = [
   "sound_effects/soundreality-explosion-8-bit-6-314688.mp3",
   "sound_effects/spacey_novanox-charge-up-sound-effect-447383.mp3",
 ];
+let muted = false;
 function playSfx() {
+  if (muted) return;
   const a = new Audio(SFX[Math.floor(Math.random() * SFX.length)]);
   a.volume = 0.4;
   a.play().catch(() => {});
 }
+$("mute").addEventListener("click", () => {
+  muted = !muted;
+  $("mute").textContent = muted ? "🔇" : "🔊";
+});
 
 $("cv").addEventListener("click", (e) => {
   if (panned) { panned = false; return; }
