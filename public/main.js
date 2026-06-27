@@ -153,7 +153,6 @@ let lbOpen = false;
 $("lbToggle").addEventListener("click", () => {
   lbOpen = !lbOpen;
   $("lbPanel").hidden = !lbOpen;
-  $("lbToggle").textContent = lbOpen ? "◀" : "▶";
 });
 function renderLb() {
   if (!lbOpen) return;
@@ -275,9 +274,9 @@ $("share").addEventListener("click", async () => {
   const btn = $("share");
   try {
     await navigator.clipboard.writeText(location.href);
-    btn.textContent = "Lien copié ✓";
+    btn.textContent = "Link Copied";
   } catch {
-    prompt("Copie le lien :", location.href);
+    prompt("Copy link:", location.href);
   }
-  setTimeout(() => (btn.textContent = "Partager"), 1500);
+  setTimeout(() => (btn.textContent = "Share"), 1500);
 });

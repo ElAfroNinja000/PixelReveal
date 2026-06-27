@@ -110,6 +110,7 @@ button:hover { filter: brightness(1.08); }
 #share { padding: 5px 10px; font-size: 13px; }
 .spectate { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; font-size: 13px; color: var(--muted); }
 .spectate input { flex: none; }
+.gallery-btn { display: inline-block; margin-top: 12px; text-decoration: none; }
 
 /* Flash global à 100% (cf. §8 : flash à 100%). */
 body.flash::after {
@@ -131,9 +132,9 @@ body.flash::after {
 
 #ranking li b { color: var(--accent); }
 
-/* Leaderboard rétractable */
-.lb { position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 6; display: flex; align-items: flex-start; }
-.lb-toggle { background: var(--card); border: 1px solid var(--line); border-right: 0; border-radius: 6px 0 0 6px; color: var(--fg); padding: 8px 4px; cursor: pointer; font-size: 13px; line-height: 1; }
+/* Leaderboard rétractable — ancré au bord droit du canvas */
+.lb { position: absolute; right: -1px; top: 0; z-index: 6; display: flex; align-items: flex-start; }
+.lb-toggle { background: var(--card); border: 1px solid var(--line); border-right: 0; border-radius: 6px 0 0 6px; color: var(--fg); padding: 8px 6px; cursor: pointer; font-size: 12px; line-height: 1; writing-mode: vertical-lr; letter-spacing: 1px; }
 .lb-panel { background: var(--card); border: 1px solid var(--line); border-right: 0; border-radius: 8px 0 0 8px; padding: 12px 14px; min-width: 160px; max-height: 60vh; overflow-y: auto; }
 .lb-panel h3 { margin: 0 0 8px; font-size: 14px; font-weight: 500; }
 .lb-panel ol { margin: 0; padding-left: 18px; font-size: 13px; }
