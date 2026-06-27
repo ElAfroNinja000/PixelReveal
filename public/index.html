@@ -33,12 +33,28 @@
     <button id="share" title="Copier le lien">Partager</button>
   </header>
 
+  <!-- Loader pendant la connexion WS -->
+  <div id="loader" class="overlay" hidden>
+    <div class="card">
+      <div class="spinner"></div>
+      <p class="muted">Connecting...</p>
+    </div>
+  </div>
+
   <main id="stage" hidden>
     <div id="wrap">
       <canvas id="cv" width="1" height="1"></canvas>
       <canvas id="fx" width="1" height="1"></canvas>
       <div id="cursors"></div>
     </div>
+    <!-- Panneau rétractable : classement joueurs en ligne -->
+    <aside id="leaderboard" class="lb">
+      <button id="lbToggle" class="lb-toggle">▶</button>
+      <div id="lbPanel" class="lb-panel" hidden>
+        <h3>Players</h3>
+        <ol id="lbList"></ol>
+      </div>
+    </aside>
   </main>
 
   <!-- Beat de complétion : image terminée + classement, ferme au clic / timeout (cf. §4.7). -->

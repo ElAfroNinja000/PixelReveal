@@ -125,7 +125,21 @@ body.flash::after {
 /* Classement */
 #ranking { text-align: left; margin: 8px 0 16px; padding-left: 22px; }
 #ranking li { padding: 2px 0; }
+/* Spinner loader */
+.spinner { width: 32px; height: 32px; border: 3px solid #333; border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 #ranking li b { color: var(--accent); }
+
+/* Leaderboard rétractable */
+.lb { position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 6; display: flex; align-items: flex-start; }
+.lb-toggle { background: var(--card); border: 1px solid var(--line); border-right: 0; border-radius: 6px 0 0 6px; color: var(--fg); padding: 8px 4px; cursor: pointer; font-size: 13px; line-height: 1; }
+.lb-panel { background: var(--card); border: 1px solid var(--line); border-right: 0; border-radius: 8px 0 0 8px; padding: 12px 14px; min-width: 160px; max-height: 60vh; overflow-y: auto; }
+.lb-panel h3 { margin: 0 0 8px; font-size: 14px; font-weight: 500; }
+.lb-panel ol { margin: 0; padding-left: 18px; font-size: 13px; }
+.lb-panel li { padding: 2px 0; }
+.lb-panel li b { color: var(--accent); }
+
 [hidden] { display: none !important; }
 
 /* Galerie */

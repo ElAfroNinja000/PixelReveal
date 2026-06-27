@@ -91,7 +91,7 @@ function connect() {
   ws.binaryType = "arraybuffer";
   ws.onopen = () => ws.send(JSON.stringify({ type: "hello", pseudo, sessionId, spectate }));
   ws.onmessage = onMessage;
-  ws.onclose = () => { $("online").textContent = "0"; };
+  ws.onclose = () => { $("online").textContent = "0"; $("loader").hidden = true; };
 }
 
 function onMessage(ev) {
@@ -107,12 +107,17 @@ function onMessage(ev) {
       setProgress(m.progress.revealed, m.progress.total);
       $("online").textContent = m.online;
       resetZoom(); // nouvel artwork -> on recadre
+      lbTally.clear(); renderLb(); // reset leaderboard pour le nouvel artwork
+      $("loader").hidden = true;
+      $("hud").hidden = false;
+      $("stage").hidden = false;
       break;
     }
     case "painted":
       setPixel(m.i, m.c);
       ctx.putImageData(img, 0, 0); // delta : un seul pixel repeint (cf. §8)
       flashPixel(m.i);
+      if (m.pseudo) { lbTally.set(m.pseudo, (lbTally.get(m.pseudo) ?? 0) + 1); renderLb(); }
       break;
     case "progress": setProgress(m.revealed, m.total); break;
     case "online": $("online").textContent = m.count; break;
@@ -142,6 +147,21 @@ function showCursor(m) {
   c.timer = setTimeout(() => { c.el.remove(); cursors.delete(m.id); }, 3000); // purge si inactif
 }
 
+// --- Leaderboard rétractable (classement joueurs par pixels, tally côté client) ---
+const lbTally = new Map(); // pseudo -> count (maintenu depuis painted.pseudo)
+let lbOpen = false;
+$("lbToggle").addEventListener("click", () => {
+  lbOpen = !lbOpen;
+  $("lbPanel").hidden = !lbOpen;
+  $("lbToggle").textContent = lbOpen ? "◀" : "▶";
+});
+function renderLb() {
+  if (!lbOpen) return;
+  const sorted = [...lbTally.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15);
+  $("lbList").innerHTML = sorted.map(([p, n]) => `<li><b>${esc(p)}</b> ${n}</li>`).join("");
+}
+$("lbToggle").addEventListener("click", renderLb);
+
 // --- Beat de complétion + bascule partagée (reconnexion) (cf. §4.7) ---
 let beatTimer = null;
 function onCompleted(ranking) {
@@ -166,11 +186,9 @@ $("loginForm").addEventListener("submit", (e) => {
   pseudo = $("pseudo").value.trim() || "anon";
   spectate = $("spectate").checked;
   store("pixelreveal.pseudo", pseudo);
-  $("meName").textContent = pseudo; // libellé contribution = pseudo ([Pseudo] : N pixels)
-  $("meName").textContent = pseudo; // HUD : "[Pseudo] : N pixels"
+  $("meName").textContent = pseudo;
   $("login").hidden = true;
-  $("hud").hidden = false;
-  $("stage").hidden = false;
+  $("loader").hidden = false;
   connect();
 });
 
