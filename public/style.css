@@ -86,8 +86,8 @@ button:hover { filter: brightness(1.08); }
 #zoomLayer { transform-origin: 0 0; will-change: transform; position: relative; }
 #cv, #fx {
   image-rendering: pixelated;
-  width: min(86vw, 70vh, 640px);
-  height: min(86vw, 70vh, 640px);
+  width: min(92vw, 82vh, 800px);
+  height: min(92vw, 82vh, 800px);
 }
 #fx { position: absolute; inset: 0; pointer-events: none; } /* couche de feedback transient */
 #cv { cursor: crosshair; }
