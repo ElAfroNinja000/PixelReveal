@@ -197,18 +197,18 @@ $("next").addEventListener("click", advance);
 let scale = 1, tx = 0, ty = 0;
 let panning = false, panned = false, startX = 0, startY = 0, baseTx = 0, baseTy = 0;
 const wrap = $("wrap");
+const zoomLayer = $("zoomLayer");
 
 function applyTransform() {
-  wrap.style.transform = scale === 1 ? "" : `translate(${tx}px, ${ty}px) scale(${scale})`;
+  zoomLayer.style.transform = scale === 1 ? "" : `translate(${tx}px, ${ty}px) scale(${scale})`;
 }
 function resetZoom() { scale = 1; tx = 0; ty = 0; applyTransform(); }
 
 wrap.addEventListener("wheel", (e) => {
   e.preventDefault();
-  // Point fixe sous le curseur (origin 0,0 : le coin haut-gauche du wrap = rect - translate).
+  // Point fixe sous le curseur. wrap = conteneur fixe, layer = transformé.
   const r = wrap.getBoundingClientRect();
-  const baseL = r.left - tx, baseT = r.top - ty;
-  const mx = e.clientX - baseL, my = e.clientY - baseT;
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
   const cx = (mx - tx) / scale, cy = (my - ty) / scale;
   const ns = Math.min(8, Math.max(1, scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
   tx = mx - cx * ns;
