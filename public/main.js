@@ -234,14 +234,32 @@ window.addEventListener("mousemove", (e) => {
 });
 window.addEventListener("mouseup", () => { panning = false; });
 
+// --- Sound effects : random on click ---
+const SFX = [
+  "sound_effects/11325622-metal-hit-sound-effect-241374.mp3",
+  "sound_effects/alexis_gaming_cam-anime-shine-sound-effect-346114.mp3",
+  "sound_effects/arnav_geddada-ui-sound-2-374229.mp3",
+  "sound_effects/dragon-studio-notification-sound-effect-372475.mp3",
+  "sound_effects/ksjsbwuil-ui-beep-4-513914.mp3",
+  "sound_effects/soundreality-explosion-8-bit-14-314686.mp3",
+  "sound_effects/soundreality-explosion-8-bit-6-314688.mp3",
+  "sound_effects/spacey_novanox-charge-up-sound-effect-447383.mp3",
+];
+function playSfx() {
+  const a = new Audio(SFX[Math.floor(Math.random() * SFX.length)]);
+  a.volume = 0.4;
+  a.play().catch(() => {});
+}
+
 $("cv").addEventListener("click", (e) => {
-  if (panned) { panned = false; return; } // c'était un pan, pas un clic
+  if (panned) { panned = false; return; }
   if (spectate || !ws || ws.readyState !== 1 || Date.now() < cooldownUntil) return;
   const r = e.currentTarget.getBoundingClientRect();
   const x = Math.floor(((e.clientX - r.left) / r.width) * W);
   const y = Math.floor(((e.clientY - r.top) / r.height) * H);
   if (x < 0 || y < 0 || x >= W || y >= H) return;
   ws.send(JSON.stringify({ type: "paint", i: y * W + x }));
+  playSfx();
 });
 
 // Box du pixel visé : positionnée depuis le rect réel du canvas (suit zoom/pan).
