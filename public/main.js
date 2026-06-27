@@ -216,6 +216,7 @@ wrap.addEventListener("wheel", (e) => {
   scale = ns;
   if (scale === 1) { tx = 0; ty = 0; }
   applyTransform();
+  updateAim(e.clientX, e.clientY); // le canvas a bougé sous le curseur -> recadrer la box
 }, { passive: false });
 
 // Pan par glissé quand zoomé (sans déclencher un paint : flag panned).
@@ -243,23 +244,28 @@ $("cv").addEventListener("click", (e) => {
   ws.send(JSON.stringify({ type: "paint", i: y * W + x }));
 });
 
-// Box du pixel visé : mise à jour à chaque move (non throttlée pour rester fluide).
+// Box du pixel visé : positionnée depuis le rect réel du canvas (suit zoom/pan).
+// Recalculée sur mousemove ET sur wheel (sinon le cadre reste figé pendant le zoom).
+function updateAim(clientX, clientY) {
+  if (W <= 0) return;
+  const r = $("cv").getBoundingClientRect();
+  const nx = (clientX - r.left) / r.width, ny = (clientY - r.top) / r.height;
+  const aim = $("aim");
+  if (nx < 0 || ny < 0 || nx >= 1 || ny >= 1) { aim.hidden = true; return; }
+  const cw = r.width / W, ch = r.height / H;
+  const px = Math.floor(nx * W), py = Math.floor(ny * H);
+  aim.style.left = r.left + px * cw + "px";
+  aim.style.top = r.top + py * ch + "px";
+  aim.style.width = cw + "px";
+  aim.style.height = ch + "px";
+  aim.hidden = false;
+}
+
 let lastCursor = 0;
 $("cv").addEventListener("mousemove", (e) => {
   const r = e.currentTarget.getBoundingClientRect();
   const nx = (e.clientX - r.left) / r.width, ny = (e.clientY - r.top) / r.height;
-  if (W > 0) {
-    // Taille réelle d'une cellule à l'écran (suit le zoom via r) ; placée en coords viewport.
-    const cw = r.width / W, ch = r.height / H;
-    const px = Math.min(W - 1, Math.max(0, Math.floor(nx * W)));
-    const py = Math.min(H - 1, Math.max(0, Math.floor(ny * H)));
-    const aim = $("aim");
-    aim.style.left = r.left + px * cw + "px";
-    aim.style.top = r.top + py * ch + "px";
-    aim.style.width = cw + "px";
-    aim.style.height = ch + "px";
-    aim.hidden = false;
-  }
+  updateAim(e.clientX, e.clientY);
   // Curseur live : envoi throttlé (~16/s) en coords normalisées.
   if (!ws || ws.readyState !== 1) return;
   const now = performance.now();
